@@ -20,7 +20,9 @@ interface GeneratedSite {
   description: string;
   url: string;
   createdAt: string;
-  status: 'generating' | 'ready';
+  status: 'generating' | 'ready' | 'published';
+  publishedUrl?: string;
+  htmlContent?: string;
 }
 
 export default function Index() {
@@ -59,6 +61,9 @@ export default function Index() {
   const [sitePrompt, setSitePrompt] = useState('');
   const [generatedSites, setGeneratedSites] = useState<GeneratedSite[]>([]);
   const [showMySites, setShowMySites] = useState(false);
+  const [showSitePreview, setShowSitePreview] = useState<GeneratedSite | null>(null);
+  const [selectedUserForEnergy, setSelectedUserForEnergy] = useState<string | null>(null);
+  const [energyAmount, setEnergyAmount] = useState<number>(0);
 
   useEffect(() => {
     const savedSites = localStorage.getItem('generatedSites');
@@ -157,13 +162,15 @@ export default function Index() {
     const newEnergy = user.energy === Infinity ? Infinity : user.energy - 10;
     setUser({ ...user, energy: newEnergy });
 
+    const randomId = Math.random().toString(36).substring(2, 10);
     const newSite: GeneratedSite = {
       id: Date.now().toString(),
       title: sitePrompt.slice(0, 50),
       description: sitePrompt,
-      url: `https://site-${Date.now()}.example.com`,
+      url: `https://yehali-${randomId}.local`,
       createdAt: new Date().toLocaleString('ru-RU'),
-      status: 'generating'
+      status: 'generating',
+      htmlContent: generateSiteHTML(sitePrompt)
     };
 
     setGeneratedSites([newSite, ...generatedSites]);
@@ -193,6 +200,93 @@ export default function Index() {
       title: '👋 До встречи!',
       description: 'Вы вышли из аккаунта'
     });
+  };
+
+  const generateSiteHTML = (prompt: string): string => {
+    return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${prompt.slice(0, 50)}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 60px 40px;
+            max-width: 800px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        h1 {
+            font-size: 3em;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        p {
+            font-size: 1.2em;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .badge {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            display: inline-block;
+            font-size: 0.9em;
+        }
+        .footer {
+            margin-top: 40px;
+            color: #999;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Сайт создан!</h1>
+        <p>${prompt}</p>
+        <div class="badge">Создано с помощью Уехали</div>
+        <div class="footer">Этот сайт был сгенерирован ИИ</div>
+    </div>
+</body>
+</html>`;
+  };
+
+  const handlePublishSite = (site: GeneratedSite) => {
+    const randomId = Math.random().toString(36).substring(2, 10);
+    const publishedUrl = `https://yehali-${randomId}.poehali.dev`;
+    
+    setGeneratedSites(prev => prev.map(s => 
+      s.id === site.id ? { ...s, status: 'published', publishedUrl } : s
+    ));
+
+    toast({
+      title: '🌐 Сайт опубликован!',
+      description: `Доступен по адресу: ${publishedUrl}`
+    });
+  };
+
+  const handleAddEnergy = (username: string, amount: number) => {
+    if (user?.username === username && user.energy !== Infinity) {
+      setUser({ ...user, energy: user.energy + amount });
+      toast({
+        title: '⚡ Энергия пополнена!',
+        description: `Добавлено ${amount} единиц энергии`
+      });
+    }
   };
 
   return (
@@ -616,10 +710,24 @@ export default function Index() {
                             {u.energy}
                           </Badge>
                           <div className="flex gap-2">
-                            <Button size="sm" variant="outline">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedUserForEnergy(u.name);
+                                setEnergyAmount(50);
+                              }}
+                            >
                               <Icon name="Plus" size={14} />
                             </Button>
-                            <Button size="sm" variant="outline">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedUserForEnergy(u.name);
+                                setEnergyAmount(-50);
+                              }}
+                            >
                               <Icon name="Minus" size={14} />
                             </Button>
                           </div>
@@ -698,42 +806,75 @@ export default function Index() {
                               </span>
                             </div>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex flex-col gap-2">
                             {site.status === 'ready' && (
                               <>
-                                <Button size="sm" variant="default" className="gap-2" asChild>
-                                  <a href={site.url} target="_blank" rel="noopener noreferrer">
-                                    <Icon name="ExternalLink" size={14} />
-                                    Открыть
-                                  </a>
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(site.url);
-                                    toast({
-                                      title: '✅ Скопировано!',
-                                      description: 'Ссылка скопирована в буфер обмена'
-                                    });
-                                  }}
-                                >
-                                  <Icon name="Copy" size={14} />
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() => {
-                                    setGeneratedSites(prev => prev.filter(s => s.id !== site.id));
-                                    toast({
-                                      title: '🗑️ Удалено',
-                                      description: 'Сайт удален из списка'
-                                    });
-                                  }}
-                                >
-                                  <Icon name="Trash2" size={14} />
-                                </Button>
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="default" 
+                                    className="gap-2"
+                                    onClick={() => setShowSitePreview(site)}
+                                  >
+                                    <Icon name="Eye" size={14} />
+                                    Просмотр
+                                  </Button>
+                                  
+                                  {site.status === 'published' ? (
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      className="gap-2 text-green-600 border-green-600"
+                                      onClick={() => {
+                                        window.open(site.publishedUrl, '_blank');
+                                      }}
+                                    >
+                                      <Icon name="Globe" size={14} />
+                                      В интернете
+                                    </Button>
+                                  ) : (
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      className="gap-2"
+                                      onClick={() => handlePublishSite(site)}
+                                    >
+                                      <Icon name="Upload" size={14} />
+                                      Опубликовать
+                                    </Button>
+                                  )}
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => {
+                                      const urlToCopy = site.publishedUrl || site.url;
+                                      navigator.clipboard.writeText(urlToCopy);
+                                      toast({
+                                        title: '✅ Скопировано!',
+                                        description: 'Ссылка скопирована в буфер обмена'
+                                      });
+                                    }}
+                                  >
+                                    <Icon name="Copy" size={14} />
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                      setGeneratedSites(prev => prev.filter(s => s.id !== site.id));
+                                      toast({
+                                        title: '🗑️ Удалено',
+                                        description: 'Сайт удален из списка'
+                                      });
+                                    }}
+                                  >
+                                    <Icon name="Trash2" size={14} />
+                                  </Button>
+                                </div>
                               </>
                             )}
                           </div>
@@ -756,6 +897,141 @@ export default function Index() {
                   <Icon name="Plus" size={18} />
                   Создать новый сайт
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {showSitePreview && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] animate-fade-in p-4">
+          <Card className="w-full max-w-6xl max-h-[90vh] overflow-hidden animate-scale-in">
+            <CardContent className="pt-6 h-full flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h2 className="text-xl font-bold flex items-center gap-2 mb-1">
+                    <Icon name="Eye" size={24} className="text-primary" />
+                    Предварительный просмотр
+                  </h2>
+                  <p className="text-sm text-muted-foreground">{showSitePreview.title}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {showSitePreview.status === 'published' && showSitePreview.publishedUrl && (
+                    <Badge variant="default" className="gap-2">
+                      <Icon name="Globe" size={14} />
+                      Опубликован
+                    </Badge>
+                  )}
+                  <Button variant="ghost" size="icon" onClick={() => setShowSitePreview(null)}>
+                    <Icon name="X" size={20} />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex-1 border rounded-lg overflow-hidden bg-white">
+                <iframe
+                  srcDoc={showSitePreview.htmlContent}
+                  className="w-full h-full"
+                  title="Site Preview"
+                  sandbox="allow-scripts"
+                />
+              </div>
+
+              <div className="flex gap-3 mt-4">
+                {showSitePreview.status === 'published' && showSitePreview.publishedUrl ? (
+                  <Button 
+                    className="flex-1 gap-2"
+                    onClick={() => window.open(showSitePreview.publishedUrl, '_blank')}
+                  >
+                    <Icon name="ExternalLink" size={16} />
+                    Открыть опубликованный сайт
+                  </Button>
+                ) : (
+                  <Button 
+                    className="flex-1 gap-2"
+                    onClick={() => {
+                      handlePublishSite(showSitePreview);
+                      setShowSitePreview(null);
+                    }}
+                  >
+                    <Icon name="Upload" size={16} />
+                    Опубликовать в интернет
+                  </Button>
+                )}
+                
+                <Button 
+                  variant="outline" 
+                  className="gap-2"
+                  onClick={() => {
+                    const urlToCopy = showSitePreview.publishedUrl || showSitePreview.url;
+                    navigator.clipboard.writeText(urlToCopy);
+                    toast({
+                      title: '✅ Ссылка скопирована!',
+                      description: urlToCopy
+                    });
+                  }}
+                >
+                  <Icon name="Copy" size={16} />
+                  Копировать ссылку
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {selectedUserForEnergy && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] animate-fade-in">
+          <Card className="w-full max-w-md mx-4 animate-scale-in">
+            <CardContent className="pt-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Icon name="Zap" size={24} className="text-primary" />
+                  Управление энергией
+                </h2>
+                <Button variant="ghost" size="icon" onClick={() => setSelectedUserForEnergy(null)}>
+                  <Icon name="X" size={20} />
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground mb-1">Пользователь</div>
+                  <div className="font-semibold">{selectedUserForEnergy}</div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Количество энергии
+                  </label>
+                  <Input
+                    type="number"
+                    value={energyAmount}
+                    onChange={(e) => setEnergyAmount(Number(e.target.value))}
+                    placeholder="Введите количество"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {energyAmount > 0 ? 'Будет добавлено' : 'Будет списано'}: {Math.abs(energyAmount)} единиц
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    onClick={() => {
+                      handleAddEnergy(selectedUserForEnergy, energyAmount);
+                      setSelectedUserForEnergy(null);
+                    }}
+                  >
+                    Применить
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSelectedUserForEnergy(null)}
+                  >
+                    Отмена
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
