@@ -14,6 +14,15 @@ interface User {
   isAdmin: boolean;
 }
 
+interface GeneratedSite {
+  id: string;
+  title: string;
+  description: string;
+  url: string;
+  createdAt: string;
+  status: 'generating' | 'ready';
+}
+
 export default function Index() {
   const { toast } = useToast();
   const [isAuth, setIsAuth] = useState(false);
@@ -48,7 +57,21 @@ export default function Index() {
   
   const [user, setUser] = useState<User | null>(null);
   const [sitePrompt, setSitePrompt] = useState('');
-  const [generatedSites, setGeneratedSites] = useState<string[]>([]);
+  const [generatedSites, setGeneratedSites] = useState<GeneratedSite[]>([]);
+  const [showMySites, setShowMySites] = useState(false);
+
+  useEffect(() => {
+    const savedSites = localStorage.getItem('generatedSites');
+    if (savedSites) {
+      setGeneratedSites(JSON.parse(savedSites));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (generatedSites.length > 0) {
+      localStorage.setItem('generatedSites', JSON.stringify(generatedSites));
+    }
+  }, [generatedSites]);
 
   const [authForm, setAuthForm] = useState({
     email: '',
@@ -131,16 +154,34 @@ export default function Index() {
       return;
     }
 
-    if (user.energy !== Infinity) {
-      setUser({ ...user, energy: user.energy - 10 });
-    }
+    const newEnergy = user.energy === Infinity ? Infinity : user.energy - 10;
+    setUser({ ...user, energy: newEnergy });
 
-    setGeneratedSites([...generatedSites, sitePrompt]);
+    const newSite: GeneratedSite = {
+      id: Date.now().toString(),
+      title: sitePrompt.slice(0, 50),
+      description: sitePrompt,
+      url: `https://site-${Date.now()}.example.com`,
+      createdAt: new Date().toLocaleString('ru-RU'),
+      status: 'generating'
+    };
+
+    setGeneratedSites([newSite, ...generatedSites]);
     
     toast({
       title: '🚀 Сайт создается!',
-      description: `Осталось энергии: ${user.energy === Infinity ? '∞' : user.energy - 10}`
+      description: `Осталось энергии: ${newEnergy === Infinity ? '∞' : newEnergy}`
     });
+
+    setTimeout(() => {
+      setGeneratedSites(prev => prev.map(site => 
+        site.id === newSite.id ? { ...site, status: 'ready' } : site
+      ));
+      toast({
+        title: '✅ Сайт готов!',
+        description: 'Можете перейти к просмотру'
+      });
+    }, 3000);
 
     setSitePrompt('');
   };
@@ -188,6 +229,11 @@ export default function Index() {
                 <Button onClick={() => setShowBuilderModal(true)} className="gap-2">
                   <Icon name="Sparkles" size={16} />
                   Создать сайт
+                </Button>
+
+                <Button onClick={() => setShowMySites(true)} variant="outline" className="gap-2">
+                  <Icon name="Globe" size={16} />
+                  Мои сайты ({generatedSites.length})
                 </Button>
 
                 {user.isAdmin && (
@@ -494,20 +540,19 @@ export default function Index() {
                   </Button>
                 </div>
 
-                {generatedSites.length > 0 && (
-                  <div className="mt-6 space-y-2">
-                    <h3 className="font-semibold">Созданные сайты:</h3>
-                    {generatedSites.map((site, i) => (
-                      <div key={i} className="p-3 bg-muted rounded-lg text-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Сайт #{i + 1}:</span>
-                          <Badge variant="secondary">Готов</Badge>
-                        </div>
-                        <p className="mt-1 font-medium">{site}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div className="mt-4">
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2"
+                    onClick={() => {
+                      setShowBuilderModal(false);
+                      setShowMySites(true);
+                    }}
+                  >
+                    <Icon name="FolderOpen" size={16} />
+                    Посмотреть все мои сайты ({generatedSites.length})
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -583,6 +628,134 @@ export default function Index() {
                     ))}
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {showMySites && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in p-4">
+          <Card className="w-full max-w-5xl max-h-[85vh] overflow-auto animate-scale-in">
+            <CardContent className="pt-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <Icon name="Globe" size={28} className="text-primary" />
+                  Мои сайты ({generatedSites.length})
+                </h2>
+                <Button variant="ghost" size="icon" onClick={() => setShowMySites(false)}>
+                  <Icon name="X" size={20} />
+                </Button>
+              </div>
+
+              {generatedSites.length === 0 ? (
+                <div className="text-center py-12">
+                  <Icon name="FolderOpen" size={64} className="text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <h3 className="text-xl font-semibold mb-2">Пока нет созданных сайтов</h3>
+                  <p className="text-muted-foreground mb-6">Создайте свой первый сайт с помощью ИИ</p>
+                  <Button onClick={() => {
+                    setShowMySites(false);
+                    setShowBuilderModal(true);
+                  }} className="gap-2">
+                    <Icon name="Sparkles" size={16} />
+                    Создать первый сайт
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {generatedSites.map((site) => (
+                    <Card key={site.id} className="border-2 hover:border-primary transition-all">
+                      <CardContent className="pt-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="text-lg font-semibold truncate">{site.title}</h3>
+                              <Badge variant={site.status === 'ready' ? 'default' : 'secondary'} className="gap-1">
+                                {site.status === 'ready' ? (
+                                  <>
+                                    <Icon name="CheckCircle" size={14} />
+                                    Готов
+                                  </>
+                                ) : (
+                                  <>
+                                    <Icon name="Loader2" size={14} className="animate-spin" />
+                                    Создается
+                                  </>
+                                )}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                              {site.description}
+                            </p>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Icon name="Calendar" size={14} />
+                                {site.createdAt}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Icon name="Link" size={14} />
+                                {site.url}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {site.status === 'ready' && (
+                              <>
+                                <Button size="sm" variant="default" className="gap-2" asChild>
+                                  <a href={site.url} target="_blank" rel="noopener noreferrer">
+                                    <Icon name="ExternalLink" size={14} />
+                                    Открыть
+                                  </a>
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(site.url);
+                                    toast({
+                                      title: '✅ Скопировано!',
+                                      description: 'Ссылка скопирована в буфер обмена'
+                                    });
+                                  }}
+                                >
+                                  <Icon name="Copy" size={14} />
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => {
+                                    setGeneratedSites(prev => prev.filter(s => s.id !== site.id));
+                                    toast({
+                                      title: '🗑️ Удалено',
+                                      description: 'Сайт удален из списка'
+                                    });
+                                  }}
+                                >
+                                  <Icon name="Trash2" size={14} />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-6 pt-6 border-t">
+                <Button 
+                  onClick={() => {
+                    setShowMySites(false);
+                    setShowBuilderModal(true);
+                  }} 
+                  className="w-full gap-2"
+                  size="lg"
+                >
+                  <Icon name="Plus" size={18} />
+                  Создать новый сайт
+                </Button>
               </div>
             </CardContent>
           </Card>
