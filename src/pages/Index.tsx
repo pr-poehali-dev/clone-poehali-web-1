@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,6 +21,30 @@ export default function Index() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [showBuilderModal, setShowBuilderModal] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [isDark, setIsDark] = useState(true);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+      setIsDark(false);
+      document.documentElement.classList.remove('dark');
+    } else {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = !isDark;
+    setIsDark(newTheme);
+    if (newTheme) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
   
   const [user, setUser] = useState<User | null>(null);
   const [sitePrompt, setSitePrompt] = useState('');
@@ -150,6 +174,10 @@ export default function Index() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Button onClick={toggleTheme} variant="ghost" size="icon" className="mr-2">
+              <Icon name={isDark ? 'Sun' : 'Moon'} size={20} />
+            </Button>
+            
             {isAuth && user ? (
               <>
                 <Badge variant="outline" className="px-3 py-1 gap-2">
