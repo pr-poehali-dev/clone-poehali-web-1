@@ -132,7 +132,7 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-lg border-b z-50">
+      <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b z-50">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon name="Rocket" size={32} className="text-primary" />
